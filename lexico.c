@@ -120,10 +120,23 @@ Token proximo_token(Scanner *sc){
 
 /* ========================= main ========================= */
 
-int main(void){
-
+int main(int argc, char *argv[]){
     char Entrada[1024];
-    scanf("%[^\n]", Entrada);
+
+    if(argc >= 2){
+        // Usa argumento da linha de comando
+        strncpy(Entrada, argv[1], sizeof(Entrada)-1);
+        Entrada[sizeof(Entrada)-1] = '\0';
+    } else {
+        // Lê do teclado
+        printf("Digite a expressao: ");
+        if(!fgets(Entrada, sizeof(Entrada), stdin)){
+            fprintf(stderr, "Erro ao ler entrada.\n");
+            return 1;
+        }
+        // Remove o \n no final, se existir
+        Entrada[strcspn(Entrada, "\n")] = '\0';
+    }
 
     Scanner S; 
     iniciar(&S, Entrada);
