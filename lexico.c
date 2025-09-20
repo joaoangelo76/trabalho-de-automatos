@@ -11,6 +11,7 @@
 
 typedef enum {
     TOKEN_INTEIRO,
+    TOKEN_STRING,
     TOKEN_MAIS,      // +
     TOKEN_MENOS,     // -
     TOKEN_MULT,      // *
@@ -35,9 +36,14 @@ typedef struct {
     char c;
 } Scanner;
 
+Token coletar_string(Scanner *sc);
+Token coletar_comentario(Scanner *sc);
+Token coletar_comentario2(Scanner *sc);
+
 char* nome_token(TipoToken t){
     switch(t){
         case TOKEN_INTEIRO:   return "INTEIRO";
+        case TOKEN_STRING:    return "STRING";
         case TOKEN_MAIS:      return "MAIS";
         case TOKEN_MENOS:     return "MENOS";
         case TOKEN_MULT:      return "MULT";
@@ -100,7 +106,15 @@ Token proximo_token(Scanner *sc){
     pular_espacos(sc);
     if(sc->c=='\0') return criar_token_texto(sc, TOKEN_FIM, "", 0, sc->linha, sc->coluna);
 
+    if(sc->c == '\'') return coletar_string(sc);
+
     if(isdigit((unsigned char)sc->c)) return coletar_inteiro(sc);
+
+    if(sc->c == '{') return coletar_comentario(sc);
+
+    if(sc->c == '(' && sc->src[sc->i+1] == '*') return coletar_comentario2(sc);
+
+    if(sc->c == '\'') return coletar_string(sc);
 
     switch(sc->c){
         case '+': return token_simples(sc, TOKEN_MAIS);
@@ -110,11 +124,83 @@ Token proximo_token(Scanner *sc){
         case '(': return token_simples(sc, TOKEN_ABRE_PAR);
         case ')': return token_simples(sc, TOKEN_FECHA_PAR);
         default: {
+            int lin_erro = sc->linha;
+            int col_erro = sc->coluna;
+    
             char msg[64];
             snprintf(msg, sizeof(msg), "Caractere inválido: '%c'", sc->c);
+    
+            avancar(sc); 
+    
+            return criar_token_texto(sc, TOKEN_ERRO, msg, strlen(msg), lin_erro, col_erro);
+        }   
+    }
+}
+
+Token coletar_string(Scanner *sc){
+    int lin = sc->linha;
+    int col = sc->coluna;       // posição onde a ' foi encontrada (início da string)
+    size_t inicio_quote = sc->i; // índice do ' inicial
+
+    avancar(sc); // consumir a aspas inicial '
+
+    // percorre até encontrar a aspas de fechamento, EOF ou newline
+    while(sc->c != '\0' && sc->c != '\n'){
+        if(sc->c == '\''){
+            // caso Pascal: '' dentro da string significa uma aspa simples literal
+            if(sc->src[sc->i + 1] == '\''){
+                // consome as duas aspas e continua
+                avancar(sc); // primeira '
+                avancar(sc); // segunda '
+                continue;
+            } else {
+                // aspas de fechamento encontrada
+                // lexema sem as aspas: começa em inicio_quote+1 e tem comprimento sc->i - (inicio_quote+1)
+                size_t len = sc->i - (inicio_quote + 1);
+                Token t = criar_token_texto(sc, TOKEN_STRING, sc->src + inicio_quote + 1, len, lin, col);
+                avancar(sc); // consumir a aspas de fechamento
+                return t;
+            }
+        } else {
             avancar(sc);
-            return token_erro_msg(sc, msg);
         }
+    }
+
+    // saiu do loop por encontrar '\n' ou '\0' => string não fechada
+    const char *msg = "String nao-fechada antes da quebra de linha/EOF";
+    return criar_token_texto(sc, TOKEN_ERRO, msg, strlen(msg), lin, col);
+}
+
+Token coletar_comentario(Scanner *sc){
+    int lin = sc->linha, col = sc->coluna;
+    avancar(sc); // consumir o {
+    while(sc->c != '}' && sc->c != '\0'){
+        avancar(sc);
+    }
+    if(sc->c == '}'){
+        avancar(sc); // consumir o }
+        return proximo_token(sc); // ignora comentário, busca próximo
+    } else {
+        return token_erro_msg(sc, "Comentario nao-fechado antes do fim do arquivo");
+    }
+}
+
+Token coletar_comentario2(Scanner *sc){
+    int lin = sc->linha, col = sc->coluna;
+    avancar(sc); // consumir (
+    if(sc->c == '*'){
+        avancar(sc); // consumir *
+        while(!(sc->c == '*' && sc->src[sc->i+1] == ')') && sc->c != '\0'){
+            avancar(sc);
+        }
+        if(sc->c == '\0'){
+            return token_erro_msg(sc, "Comentario nao-fechado antes do fim do arquivo");
+        }
+        avancar(sc); // consumir *
+        avancar(sc); // consumir )
+        return proximo_token(sc);
+    } else {
+        return token_erro_msg(sc, "Caractere inválido: '(' esperado '*'");
     }
 }
 
@@ -129,7 +215,6 @@ int main(int argc, char *argv[]){
         Entrada[sizeof(Entrada)-1] = '\0';
     } else {
         // Lê do teclado
-        printf("Digite a expressao: ");
         if(!fgets(Entrada, sizeof(Entrada), stdin)){
             fprintf(stderr, "Erro ao ler entrada.\n");
             return 1;
@@ -146,7 +231,9 @@ int main(int argc, char *argv[]){
         printf("(%s, \"%s\") @ linha %d, col %d\n",
                nome_token(t.tipo), t.lexema, t.linha, t.coluna);
         free(t.lexema);
-        if(t.tipo==TOKEN_FIM || t.tipo==TOKEN_ERRO) break;
+        
+        // O loop agora só para no fim do arquivo
+        if(t.tipo==TOKEN_FIM) break;
     }
     return 0;
 }
