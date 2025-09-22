@@ -18,6 +18,9 @@ typedef enum {
     TOKEN_MAIS,
     TOKEN_MENOS,
     TOKEN_MULT,
+    TOKEN_PONTO_VIRGULA,
+    TOKEN_PONTO,
+    TOKEN_DOIS_PONTOS,
     TOKEN_DIV,
     TOKEN_ABRE_PAR,
     TOKEN_FECHA_PAR,
@@ -70,6 +73,9 @@ char* nome_token(TipoToken t){
         case TOKEN_MENOS:           return "MENOS";
         case TOKEN_MULT:            return "MULT";
         case TOKEN_DIV:             return "DIV";
+        case TOKEN_PONTO_VIRGULA:   return "PONTO_VIRGULA";
+        case TOKEN_PONTO:           return "PONTO";
+        case TOKEN_DOIS_PONTOS:     return "DOIS_PONTO";
         case TOKEN_ABRE_PAR:        return "ABRE_PAR";
         case TOKEN_FECHA_PAR:       return "FECHA_PAR";
         case TOKEN_ATRIBUICAO:      return "ATRIBUICAO";
@@ -146,28 +152,24 @@ Token proximo_token(Scanner *sc){
         return criar_token_texto(sc, TOKEN_ATRIBUICAO, p, 2, lin, col);
     }
 
-    switch(sc->c){
+        switch(sc->c){
         case '+': return token_simples(sc, TOKEN_MAIS);
         case '-': return token_simples(sc, TOKEN_MENOS);
         case '*': return token_simples(sc, TOKEN_MULT);
         case '/': return token_simples(sc, TOKEN_DIV);
         case '(': return token_simples(sc, TOKEN_ABRE_PAR);
         case ')': return token_simples(sc, TOKEN_FECHA_PAR);
-        case ';': {
-            int lin=sc->linha, col=sc->coluna;
-            // const char *p = sc->src + sc->i;
-            avancar(sc);
-            return criar_token_texto(sc, TOKEN_ERRO, "Caractere inválido: ';'", strlen("Caractere inválido: ';'"), lin, col);
-        }
-        case '.': {
-            int lin=sc->linha, col=sc->coluna;
-            avancar(sc);
-            return criar_token_texto(sc, TOKEN_ERRO, "Caractere inválido: '.'", strlen("Caractere inválido: '.'"), lin, col);
-        }
+        case ';': return token_simples(sc, TOKEN_PONTO_VIRGULA);  // agora é token válido
+        case '.': return token_simples(sc, TOKEN_PONTO);          // fim do programa
         case ':': {
-            int lin=sc->linha, col=sc->coluna;
+            int lin = sc->linha, col = sc->coluna;
             avancar(sc);
-            return criar_token_texto(sc, TOKEN_ERRO, "Caractere inválido: ':'", strlen("Caractere inválido: ':'"), lin, col);
+            if(sc->c == '='){  // verifica se é ':='
+                avancar(sc);
+                return criar_token_texto(sc, TOKEN_ATRIBUICAO, ":=", 2, lin, col);
+            } else {
+                return criar_token_texto(sc, TOKEN_DOIS_PONTOS, ":", 1, lin, col);
+            }
         }
         default: {
             int lin_erro = sc->linha;
@@ -392,12 +394,22 @@ int main(int argc, char *argv[]){
         if(t.tipo==TOKEN_FIM) break;
     }
 
-    // imprimir TS
+    // imprime no arquivo
     fprintf(output_file, "\n--- Tabela de Símbolos ---\n");
-    for(int i = 0; i < ts_count; i++){
-        fprintf(output_file, " [%d] -> <%s, \"%s\">\n", i, nome_token(tabela_simbolos[i].tipo), tabela_simbolos[i].lexema);
+    for (int i = 0; i < ts_count; i++) {
+        fprintf(output_file, " [%d] -> <%s, \"%s\">\n", 
+                i, nome_token(tabela_simbolos[i].tipo), tabela_simbolos[i].lexema);
     }
     fprintf(output_file, "--- Fim da Tabela de Símbolos ---\n");
+
+    // imprime no terminal também
+    printf("\n--- Tabela de Símbolos ---\n");
+    for (int i = 0; i < ts_count; i++) {
+        printf(" [%d] -> <%s, \"%s\">\n", 
+            i, nome_token(tabela_simbolos[i].tipo), tabela_simbolos[i].lexema);
+    }
+    printf("--- Fim da Tabela de Símbolos ---\n");
+
 
     fclose(output_file);
     free(Entrada);
