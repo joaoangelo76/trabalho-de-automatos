@@ -1,5 +1,3 @@
-// lexico-teste.c - versão revisada do analisador léxico para comparação
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -377,9 +375,9 @@ int main(int argc, char *argv[]){
 
     for(;;){
         Token t = proximo_token(&S);
-        fprintf(output_file, "<%s, \"%s\"> @ linha %d, col %d\n",
+        fprintf(output_file, "<%s, \"%s\"> @ linha %d, coluna %d\n",
                 nome_token(t.tipo), t.lexema, t.linha, t.coluna);
-        printf("<%s, \"%s\"> @ linha %d, col %d\n",
+        printf("<%s, \"%s\"> @ linha %d, coluna %d\n",
                 nome_token(t.tipo), t.lexema, t.linha, t.coluna);
         free(t.lexema);
         if(t.tipo==TOKEN_FIM) break;
