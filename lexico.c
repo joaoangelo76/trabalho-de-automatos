@@ -1,6 +1,6 @@
 // lexico.c - analisador léxico com Tabela de Símbolos, saída em arquivo e correção para FIM
 // Compilar: gcc -std=c11 -O2 lexico.c -o lexico
-// Testar:   echo "var contador := 10;" > test.in && ./lexico test.in
+// Testar:   echo "program teste; begin write('Olá mundo); end." > test.in && ./lexico test.in
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -21,6 +21,13 @@ typedef enum {
     TOKEN_PONTO_VIRGULA,
     TOKEN_PONTO,
     TOKEN_DOIS_PONTOS,
+    TOKEN_MENOR,       
+    TOKEN_MAIOR,      
+    TOKEN_MENOR_IGUAL, 
+    TOKEN_MAIOR_IGUAL, 
+    TOKEN_IGUAL,      
+    TOKEN_DIFERENTE,
+    TOKEN_VIRGULA,
     TOKEN_DIV,
     TOKEN_ABRE_PAR,
     TOKEN_FECHA_PAR,
@@ -74,6 +81,13 @@ char* nome_token(TipoToken t){
         case TOKEN_MULT:            return "MULT";
         case TOKEN_DIV:             return "DIV";
         case TOKEN_PONTO_VIRGULA:   return "PONTO_VIRGULA";
+        case TOKEN_MENOR:           return "MENOR";
+        case TOKEN_MAIOR:           return "MAIOR";
+        case TOKEN_MENOR_IGUAL:     return "MENOR_IGUAL";
+        case TOKEN_MAIOR_IGUAL:     return "MAIOR_IGUAL";
+        case TOKEN_IGUAL:           return "IGUAL";
+        case TOKEN_DIFERENTE:       return "DIFERENTE";
+        case TOKEN_VIRGULA:         return "VIRGULA";
         case TOKEN_PONTO:           return "PONTO";
         case TOKEN_DOIS_PONTOS:     return "DOIS_PONTO";
         case TOKEN_ABRE_PAR:        return "ABRE_PAR";
@@ -145,6 +159,40 @@ Token proximo_token(Scanner *sc){
     if(sc->c == '{') return coletar_comentario(sc);
     if(sc->c == '(' && sc->src[sc->i+1] == '*') return coletar_comentario2(sc);
 
+    // Operadores relacionais
+    if(sc->c == '<'){
+        int lin = sc->linha, col = sc->coluna;
+        const char *p = sc->src + sc->i;
+        avancar(sc);
+        if(sc->c == '='){          // <=
+            avancar(sc);
+            return criar_token_texto(sc, TOKEN_MENOR_IGUAL, "<=", 2, lin, col);
+        } else if(sc->c == '>'){   // <>
+            avancar(sc);
+            return criar_token_texto(sc, TOKEN_DIFERENTE, "<>", 2, lin, col);
+        } else {                    // <
+            return criar_token_texto(sc, TOKEN_MENOR, "<", 1, lin, col);
+        }
+    }
+
+    if(sc->c == '>'){
+        int lin = sc->linha, col = sc->coluna;
+        const char *p = sc->src + sc->i;
+        avancar(sc);
+        if(sc->c == '='){          // >=
+            avancar(sc);
+            return criar_token_texto(sc, TOKEN_MAIOR_IGUAL, ">=", 2, lin, col);
+        } else {                    // >
+            return criar_token_texto(sc, TOKEN_MAIOR, ">", 1, lin, col);
+        }
+    }
+
+    if(sc->c == '='){
+        int lin = sc->linha, col = sc->coluna;
+        avancar(sc);
+        return criar_token_texto(sc, TOKEN_IGUAL, "=", 1, lin, col);
+    }
+
     if(sc->c == ':' && sc->src[sc->i+1] == '='){
         int lin = sc->linha, col = sc->coluna;
         const char *p = sc->src + sc->i;
@@ -159,7 +207,8 @@ Token proximo_token(Scanner *sc){
         case '/': return token_simples(sc, TOKEN_DIV);
         case '(': return token_simples(sc, TOKEN_ABRE_PAR);
         case ')': return token_simples(sc, TOKEN_FECHA_PAR);
-        case ';': return token_simples(sc, TOKEN_PONTO_VIRGULA);  // agora é token válido
+        case ';': return token_simples(sc, TOKEN_PONTO_VIRGULA);
+        case ',': return token_simples(sc, TOKEN_VIRGULA);  // agora é token válido
         case '.': return token_simples(sc, TOKEN_PONTO);          // fim do programa
         case ':': {
             int lin = sc->linha, col = sc->coluna;
@@ -176,7 +225,7 @@ Token proximo_token(Scanner *sc){
             int col_erro = sc->coluna;
             char msg[64];
             snprintf(msg, sizeof(msg), "Caractere inválido: '%c'", sc->c);
-            avancar(sc);
+            avancar(sc); // **CORREÇÃO:** Avance o cursor para que o loop principal continue a partir do próximo caractere.
             return criar_token_texto(sc, TOKEN_ERRO, msg, strlen(msg), lin_erro, col_erro);
         }
     }
@@ -187,10 +236,10 @@ void iniciar_tabela_simbolos(){
     ts_count = 0;
     inserir_ts("program", TOKEN_PALAVRA_RESERVADA);
     inserir_ts("var", TOKEN_PALAVRA_RESERVADA);
+    inserir_ts("integer", TOKEN_PALAVRA_RESERVADA);
+    inserir_ts("real", TOKEN_PALAVRA_RESERVADA);
     inserir_ts("begin", TOKEN_PALAVRA_RESERVADA);
     inserir_ts("end", TOKEN_PALAVRA_RESERVADA);
-    inserir_ts("read", TOKEN_PALAVRA_RESERVADA);
-    inserir_ts("write", TOKEN_PALAVRA_RESERVADA);
     inserir_ts("if", TOKEN_PALAVRA_RESERVADA);
     inserir_ts("then", TOKEN_PALAVRA_RESERVADA);
     inserir_ts("else", TOKEN_PALAVRA_RESERVADA);
@@ -223,6 +272,7 @@ Token coletar_string(Scanner *sc){
     int col = sc->coluna;
     size_t inicio_quote = sc->i;
     avancar(sc); // pula o '
+
     while(sc->c != '\0' && sc->c != '\n'){
         if(sc->c == '\''){
             if(sc->src[sc->i + 1] == '\''){
@@ -240,7 +290,24 @@ Token coletar_string(Scanner *sc){
             avancar(sc);
         }
     }
-    return criar_token_texto(sc, TOKEN_ERRO, "String nao-fechada antes da quebra de linha/EOF", strlen("String nao-fechada antes da quebra de linha/EOF"), lin, col);
+
+    // String não fechada -> retorna token de erro
+    Token erro_token = criar_token_texto(sc, TOKEN_ERRO, 
+        "String nao-fechada antes da quebra de linha/EOF", 
+        strlen("String nao-fechada antes da quebra de linha/EOF"), lin, col);
+
+    // Avança apenas caracteres que não iniciam outro token, mantendo a linha ativa
+    while(sc->c != '\0' && sc->c != '\n'){
+        if(sc->c == ';' || sc->c == '.' || sc->c == ':' || sc->c == ',' || 
+           sc->c == '(' || sc->c == ')' || sc->c == '+' || sc->c == '-' ||
+           sc->c == '*' || sc->c == '/' || sc->c == '<' || sc->c == '>' || 
+           sc->c == '=' || sc->c == '\''){
+            break; // encontramos um possível token -> pare aqui
+        }
+        avancar(sc);
+    }
+
+    return erro_token;
 }
 
 Token coletar_identificador(Scanner *sc){
@@ -249,38 +316,58 @@ Token coletar_identificador(Scanner *sc){
     if(!isalpha((unsigned char)sc->c)) return token_erro_msg(sc, "Identificador malformado");
     while(isalnum((unsigned char)sc->c)) avancar(sc);
 
-    char *lexema_token = str_ndup(sc->src + ini, sc->i - ini);
-    EntradaTS* entrada_existente = consultar_ts(lexema_token);
+    char *lexema_temp = str_ndup(sc->src + ini, sc->i - ini);
+    EntradaTS* entrada_existente = consultar_ts(lexema_temp);
 
     TipoToken tipo_token;
     if(entrada_existente != NULL){
         tipo_token = entrada_existente->tipo;
-        if(tipo_token == TOKEN_PALAVRA_RESERVADA){
-            fprintf(output_file, "AVISO: Palavra reservada '%s' encontrada novamente.\n", lexema_token);
+        if (tipo_token == TOKEN_PALAVRA_RESERVADA) {
+            fprintf(output_file, "AVISO: Palavra reservada '%s' encontrada novamente.\n", lexema_temp);
         } else {
-            fprintf(output_file, "AVISO: Identificador '%s' ja foi cadastrado.\n", lexema_token);
+            fprintf(output_file, "AVISO: Identificador '%s' ja foi cadastrado.\n", lexema_temp);
         }
+        free(lexema_temp);
+        // Retorna um novo token usando o lexema da tabela de símbolos para evitar duplicação.
+        return criar_token_texto(sc, tipo_token, entrada_existente->lexema, strlen(entrada_existente->lexema), lin, col);
     } else {
         tipo_token = TOKEN_IDENTIFICADOR;
-        inserir_ts(lexema_token, tipo_token);
-        fprintf(output_file, "INFO: Novo identificador '%s' cadastrado.\n", lexema_token);
+        inserir_ts(lexema_temp, tipo_token);
+        fprintf(output_file, "INFO: Novo identificador '%s' cadastrado.\n", lexema_temp);
+        return criar_token_texto(sc, tipo_token, lexema_temp, strlen(lexema_temp), lin, col);
     }
-
-    return criar_token_texto(sc, tipo_token, lexema_token, strlen(lexema_token), lin, col);
 }
 
 Token coletar_comentario(Scanner *sc){
     int lin = sc->linha, col = sc->coluna;
     avancar(sc); // pula '{'
-    while(sc->c != '}' && sc->c != '\0'){
+
+    while(sc->c != '\0' && sc->c != '}'){
         avancar(sc);
     }
+
     if(sc->c == '}'){
         avancar(sc); // pula '}'
-        return proximo_token(sc);
-    } else {
-        return criar_token_texto(sc, TOKEN_ERRO, "Comentario nao-fechado antes do fim do arquivo", strlen("Comentario nao-fechado antes do fim do arquivo"), lin, col);
+        return proximo_token(sc); // comentário fechado, continua normalmente
     }
+
+    // Comentário não fechado -> token de erro
+    Token erro_token = criar_token_texto(sc, TOKEN_ERRO, 
+        "Comentario nao-fechado antes do fim do arquivo", 
+        strlen("Comentario nao-fechado antes do fim do arquivo"), lin, col);
+
+    // Avança até próximo caractere seguro, sem consumir tokens válidos
+    while(sc->c != '\0' && sc->c != '\n'){
+        if(sc->c == ';' || sc->c == '.' || sc->c == ':' || sc->c == ',' || 
+           sc->c == '(' || sc->c == ')' || sc->c == '+' || sc->c == '-' ||
+           sc->c == '*' || sc->c == '/' || sc->c == '<' || sc->c == '>' || 
+           sc->c == '=' || sc->c == '\''){
+            break; // possível token -> pare aqui
+        }
+        avancar(sc);
+    }
+
+    return erro_token;
 }
 
 Token coletar_comentario2(Scanner *sc){
@@ -292,13 +379,30 @@ Token coletar_comentario2(Scanner *sc){
             avancar(sc);
         }
         if(sc->c == '\0'){
-            return criar_token_texto(sc, TOKEN_ERRO, "Comentario nao-fechado antes do fim do arquivo", strlen("Comentario nao-fechado antes do fim do arquivo"), lin, col);
+            Token erro_token = criar_token_texto(sc, TOKEN_ERRO, 
+                "Comentario nao-fechado antes do fim do arquivo", 
+                strlen("Comentario nao-fechado antes do fim do arquivo"), lin, col);
+            
+            // Avança até próximo caractere seguro
+            while(sc->c != '\0' && sc->c != '\n'){
+                if(sc->c == ';' || sc->c == '.' || sc->c == ':' || sc->c == ',' || 
+                   sc->c == '(' || sc->c == ')' || sc->c == '+' || sc->c == '-' ||
+                   sc->c == '*' || sc->c == '/' || sc->c == '<' || sc->c == '>' || 
+                   sc->c == '=' || sc->c == '\''){
+                    break;
+                }
+                avancar(sc);
+            }
+
+            return erro_token;
         }
         avancar(sc); // pula '*'
         avancar(sc); // pula ')'
         return proximo_token(sc);
     } else {
-        return criar_token_texto(sc, TOKEN_ERRO, "Caractere inválido: '(' esperado '*'", strlen("Caractere inválido: '(' esperado '*'"), lin, col);
+        return criar_token_texto(sc, TOKEN_ERRO, 
+            "Caractere inválido: '(' esperado '*'", 
+            strlen("Caractere inválido: '(' esperado '*'"), lin, col);
     }
 }
 
