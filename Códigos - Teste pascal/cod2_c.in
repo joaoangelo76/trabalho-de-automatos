@@ -1,9 +1,4 @@
-program Condicao;
-var x: integer;
+program Erro4;
 begin
-    x := 10;
-    if x > 5 then
-        write('Maior')
-    else
-        write('Menor ou igual');
+  a := 5 @ 3;  { o caractere '@' é inválido }
 end.
