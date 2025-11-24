@@ -60,6 +60,7 @@ void liberar_tabela_simbolos();
 // utilidades
 char *nome_token(TipoToken t);
 
+// arquivo de logs/alerts do léxico/sintático (definido em lexico.c)
 extern FILE *output_file;
 
 #endif

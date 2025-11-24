@@ -7,7 +7,8 @@ extern FILE *output_file;
 
 int main(int argc, char *argv[]) {
     char *Entrada = NULL;
-    long total_lido = 0;
+
+    output_file = NULL; // inicializa
 
     if (argc >= 2) {
         FILE *input_file = fopen(argv[1], "rb");
@@ -36,8 +37,12 @@ int main(int argc, char *argv[]) {
         if(!output_file){
             fprintf(stderr, "Erro ao criar o arquivo de saída: %s\n", output_filename);
             free(Entrada);
+            output_file = NULL;
             return 1;
         }
+    } else {
+        fprintf(stderr, "Uso: %s arquivo.pas\n", argv[0]);
+        return 1;
     }
 
     iniciar_tabela_simbolos();
@@ -55,7 +60,7 @@ int main(int argc, char *argv[]) {
 
     liberar_tabela_simbolos();
     free(Entrada);
-    fclose(output_file);
+    if (output_file) fclose(output_file);
 
     return 0;
 }
