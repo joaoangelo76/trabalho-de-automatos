@@ -3,35 +3,48 @@
 
 #include <stdio.h>
 
-/* ========================= Tipos de Tokens ========================= */
-
 typedef enum {
-    TOKEN_INTEIRO,
-    TOKEN_STRING,
-    TOKEN_MAIS,
-    TOKEN_MENOS,
-    TOKEN_MULT,
+    // Tipos Fundamentais de Literais
+    TOKEN_NUMERO,       // Engloba INTEIRO e REAL (se o léxico não distinguir)
+    TOKEN_IDENTIFICADOR,
+    
+    // Palavras Chave (Terminais da Gramática)
+    TOKEN_PROGRAM, TOKEN_VAR, TOKEN_INTEGER, TOKEN_REAL,
+    TOKEN_BEGIN, TOKEN_END, 
+    TOKEN_IF, TOKEN_THEN, TOKEN_ELSE,
+    TOKEN_WHILE, TOKEN_DO,
+    
+    // Símbolos e Operadores
     TOKEN_PONTO_VIRGULA,
     TOKEN_PONTO,
     TOKEN_DOIS_PONTOS,
+    TOKEN_VIRGULA,
+    TOKEN_ABRE_PAR,
+    TOKEN_FECHA_PAR,
+
+    TOKEN_ATRIBUICAO, // :=
+
+    // Operadores Aritméticos e Relacionais (como terminais separados)
+    TOKEN_MAIS,
+    TOKEN_MENOS,
+    TOKEN_MULT,
+    TOKEN_DIV,
+    
+    // Operadores Relacionais explícitos (se o léxico consegue diferenciá-los de TOKEN_OP_REL)
     TOKEN_MENOR,
     TOKEN_MAIOR,
     TOKEN_MENOR_IGUAL,
     TOKEN_MAIOR_IGUAL,
     TOKEN_IGUAL,
     TOKEN_DIFERENTE,
-    TOKEN_VIRGULA,
-    TOKEN_DIV,
-    TOKEN_ABRE_PAR,
-    TOKEN_FECHA_PAR,
-    TOKEN_ATRIBUICAO,
-    TOKEN_IDENTIFICADOR,
-    TOKEN_PALAVRA_RESERVADA,
+
+    // Mantendo estes genéricos apenas para o léxico/parser se for estritamente necessário,
+    // mas o parser deve preferir os explícitos acima.
+    TOKEN_OP_REL, 
+    
     TOKEN_FIM,
     TOKEN_ERRO
 } TipoToken;
-
-/* ========================= Estruturas ========================= */
 
 typedef struct {
     TipoToken tipo;
@@ -47,20 +60,14 @@ typedef struct {
     char c;
 } Scanner;
 
-/* ========================= Protótipos usadas no Sintático ========================= */
-
-// Funções principais que o sintático usa
 void iniciar(Scanner *sc, const char *texto);
 Token proximo_token(Scanner *sc);
 
-// tabela de símbolos
 void iniciar_tabela_simbolos();
 void liberar_tabela_simbolos();
 
-// utilidades
-char *nome_token(TipoToken t);
+const char *nome_token(TipoToken t);
 
-// arquivo de logs/alerts do léxico/sintático (definido em lexico.c)
 extern FILE *output_file;
 
 #endif

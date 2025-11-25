@@ -1,3 +1,4 @@
-123 program teste;
+program Simples;
 begin
-end.
+end
+
